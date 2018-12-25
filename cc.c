@@ -3,7 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 enum{
   TK_NUM = 256,
   TK_EOF,
@@ -26,9 +25,19 @@ typedef struct Node{
   int val;
 } Node;
 
+void error(int i);
+void tokenize(char *p);
+Node *new_node(int ty, Node *lhs, Node *rhs);
+Node *new_node_num(int val);
+Node *term();
+Node *mul();
+Node *expr();
+void gen(Node *node);
+
 Node* expr();
 Token tokens[100];
 int pos = 0;
+
 
 void error(int i){
   fprintf(stderr, "Invalid token: %s\n", tokens[i].input);
@@ -91,11 +100,11 @@ Node *term(){
     pos++;
     Node *node = expr();
     if(tokens[pos].ty != ')')
-      error(tokens[pos].input);
+      error(*tokens[pos].input);
     pos++;
     return node;
   }
-  error(tokens[pos].input);
+  error(*tokens[pos].input);
 }
 
 Node *mul(){
@@ -156,7 +165,7 @@ void gen(Node *node){
 }
 
 
-int main(int argc, char const* argv[])
+int main(int argc, char *argv[])
 {
   if(argc != 2)
   {
@@ -172,34 +181,6 @@ int main(int argc, char const* argv[])
   printf("main:\n");
 
   gen(node);
-
-  //
-  // if(tokens[0].ty != TK_NUM)
-  //   error(0);
-  // printf("  mov rax, %d\n", tokens[0].val);
-  // int i = 1;
-  //
-  // while(tokens[i].ty != TK_EOF)
-  // {
-  //   if(tokens[i].ty == '+'){
-  //     i++;
-  //     if(tokens[i].ty != TK_NUM) error(i);
-  //     printf("  add rax, %d\n", tokens[i].val);
-  //     i++;
-  //     continue;
-  //   }
-  //
-  //   if(tokens[i].ty == '-')
-  //   {
-  //     i++;
-  //     if(tokens[i].ty != TK_NUM) error(i);
-  //     printf("  sub rax, %d\n", tokens[i].val);
-  //     i++;
-  //     continue;
-  //   }
-  //
-  //   error(i);
-  // }
 
   printf("  pop rax\n");
   printf("  ret\n");
