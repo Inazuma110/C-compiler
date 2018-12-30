@@ -32,6 +32,7 @@ void error(int i);
 void tokenize(char *p);
 Node *new_node(int ty, Node *lhs, Node *rhs);
 Node *new_node_num(int val);
+Node *new_node_ident(char name);
 void program();
 Node *assign();
 Node *term();
@@ -107,9 +108,19 @@ Node *new_node_num(int val){
   return node;
 }
 
+Node *new_node_ident(char name){
+  Node *node = malloc(sizeof(Node));
+  node->ty = ND_IDENT;
+  node->name = name;
+  return node;
+}
+
 Node *term(){
-  if(tokens[pos].ty == TK_NUM || tokens[pos].ty == TK_IDENT)
+  if(tokens[pos].ty == TK_NUM)
     return new_node_num(tokens[pos++].val);
+  if(tokens[pos].ty == TK_IDENT)
+    return new_node_ident(*tokens[pos++].input);
+
   if(tokens[pos].ty == '(')
   {
     pos++;
@@ -163,11 +174,19 @@ void program(){
 
 Node* assign(){
   Node *lhs = expr();
-  if(tokens[pos].ty == ';' || tokens[pos].ty == TK_EOF) return lhs;
-  if(tokens[pos].ty == '=') {
+
+  if(tokens[pos].ty == '='){
     pos++;
     return new_node('=', lhs, assign());
   }
+  if(tokens[pos].ty == ';'){
+    pos++;
+    return lhs;
+  } else {
+    fprintf(stderr, "not found semicolon.\n");
+    exit(EXIT_FAILURE);
+  }
+
   error(*tokens[pos].input);
 }
 
@@ -186,19 +205,6 @@ void gen_lval(Node *node){
 void gen(Node *node){
   if(node->ty == ND_NUM){
     printf("  push %d\n",node->val);
-    return;
-  }
-
-  if(node->ty == ND_NUM) {
-    printf("  push %d\n",node->val);
-    return;
-  }
-
-  if(node->ty == ND_IDENT) {
-    gen_lval(node);
-    printf("  pop rax\n");
-    printf("  mov rax, [rax]\n");
-    printf("  push rax\n");
     return;
   }
 
@@ -272,6 +278,7 @@ int main(int argc, char *argv[])
     printf("  pop rax\n");
   }
 
+  // epilogue
   printf("  mov rsp, rbp\n");
   printf("  pop rbp\n");
   printf("  ret\n");
