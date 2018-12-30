@@ -32,18 +32,19 @@ void error(int i);
 void tokenize(char *p);
 Node *new_node(int ty, Node *lhs, Node *rhs);
 Node *new_node_num(int val);
-Node *program();
+void program();
 Node *assign();
 Node *term();
 Node *mul();
 Node *expr();
+void gen_lval(Node *node);
 void gen(Node *node);
 
 
 Token tokens[100];
 Node *code[100];
 int pos = 0;
-int code_pos = -1;
+int code_pos = 0;
 
 
 void error(int i){
@@ -147,15 +148,18 @@ Node *mul(){
   return lhs;
 }
 
-Node *program() {
-  code_pos++;
-  Node* lhs = assign();
-  if(tokens[pos].ty == TK_EOF) {
+void program(){
+  if(tokens[pos].ty == TK_EOF)
+  {
     code[code_pos] = NULL;
-    return lhs;
+    return;
   }
-  code[code_pos] = program();
+  Node *lhs = assign();
+  code[code_pos] = lhs;
+  code_pos++;
+  program();
 }
+
 
 Node* assign(){
   Node *lhs = expr();
@@ -167,12 +171,53 @@ Node* assign(){
   error(*tokens[pos].input);
 }
 
-
+void gen_lval(Node *node){
+  if(node->ty == ND_IDENT){
+    printf("  mov rax, rbp\n");
+    printf("  sub rax, %d\n",('z' - node->name + 1) * 8);
+    printf("  push rax\n");
+    return;
+  }
+  fprintf(stderr, "lhs is not variable\n");
+  exit(EXIT_FAILURE);
+}
 
 
 void gen(Node *node){
   if(node->ty == ND_NUM){
     printf("  push %d\n",node->val);
+    return;
+  }
+
+  if(node->ty == ND_NUM) {
+    printf("  push %d\n",node->val);
+    return;
+  }
+
+  if(node->ty == ND_IDENT) {
+    gen_lval(node);
+    printf("  pop rax\n");
+    printf("  mov rax, [rax]\n");
+    printf("  push rax\n");
+    return;
+  }
+
+  if(node->ty == ND_IDENT) {
+    gen_lval(node);
+    printf("  pop rax\n");
+    printf("  mov rax, [rax]\n");
+    printf("  push rax\n");
+    return;
+  }
+
+  if(node->ty == '='){
+    gen_lval(node->lhs);
+    gen(node->rhs);
+
+    printf("  pop rdi\n");
+    printf("  pop rax\n");
+    printf("  mov [rax], rdi\n");
+    printf("  push rdi\n");
     return;
   }
 
@@ -211,16 +256,25 @@ int main(int argc, char *argv[])
   }
 
   tokenize(argv[1]);
-  Node* node = assign();
-  // Node *node = program();
+  program();
 
   printf(".intel_syntax noprefix\n");
   printf(".global main\n");
   printf("main:\n");
 
-  gen(node);
+  // prologue
+  printf("  push rbp\n");
+  printf("  mov rbp, rsp\n");
+  printf("  sub rsp, 208\n");
 
-  printf("  pop rax\n");
+  for (int i = 0; code[i]; i++){
+    gen(code[i]);
+    printf("  pop rax\n");
+  }
+
+  printf("  mov rsp, rbp\n");
+  printf("  pop rbp\n");
   printf("  ret\n");
+
   return 0;
 }
