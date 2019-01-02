@@ -1,57 +1,8 @@
-#include <ctype.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "cc.h"
 
-enum{
-  TK_NUM = 256,
-  TK_IDENT,
-  TK_EOF,
-};
-
-enum {
-  ND_NUM = 256,
-  ND_IDENT,
-};
-
-typedef struct {
-  int ty;
-  int val;
-  char *input;
-} Token;
-
-typedef struct Node{
-  int ty;
-  struct Node *lhs;
-  struct Node *rhs;
-  int val;
-  char name;
-} Node;
-
-void error(int i);
-void tokenize(char *p);
-Node *new_node(int ty, Node *lhs, Node *rhs);
-Node *new_node_num(int val);
-Node *new_node_ident(char name);
-void program();
-Node *assign();
-Node *term();
-Node *mul();
-Node *expr();
-void gen_lval(Node *node);
-void gen(Node *node);
-
-
-Token tokens[100];
-Node *code[100];
 int pos = 0;
 int code_pos = 0;
-
-
-void error(int i){
-  fprintf(stderr, "Invalid token: %s\n", tokens[i].input);
-  exit(1);
-}
+Token tokens[100];
 
 void tokenize(char *p) {
   int i = 0;
@@ -131,6 +82,7 @@ Node *term(){
     return node;
   }
   error(*tokens[pos].input);
+  return NULL;
 }
 
 Node *expr() {
@@ -188,100 +140,4 @@ Node* assign(){
   }
 
   error(*tokens[pos].input);
-}
-
-void gen_lval(Node *node){
-  if(node->ty == ND_IDENT){
-    printf("  mov rax, rbp\n");
-    printf("  sub rax, %d\n",('z' - node->name + 1) * 8);
-    printf("  push rax\n");
-    return;
-  }
-  fprintf(stderr, "lhs is not variable\n");
-  exit(EXIT_FAILURE);
-}
-
-
-void gen(Node *node){
-  if(node->ty == ND_NUM){
-    printf("  push %d\n",node->val);
-    return;
-  }
-
-  if(node->ty == ND_IDENT) {
-    gen_lval(node);
-    printf("  pop rax\n");
-    printf("  mov rax, [rax]\n");
-    printf("  push rax\n");
-    return;
-  }
-
-  if(node->ty == '='){
-    gen_lval(node->lhs);
-    gen(node->rhs);
-
-    printf("  pop rdi\n");
-    printf("  pop rax\n");
-    printf("  mov [rax], rdi\n");
-    printf("  push rdi\n");
-    return;
-  }
-
-  gen(node->lhs);
-  gen(node->rhs);
-
-  printf("  pop rdi\n");
-  printf("  pop rax\n");
-
-  switch (node->ty) {
-    case '+':
-      printf("  add rax, rdi\n");
-      break;
-    case '-':
-      printf("  sub rax, rdi\n");
-      break;
-    case '*':
-      printf("  mul rdi\n");
-      break;
-    case '/':
-      printf("  mov rdx, 0\n");
-      printf("  div rdi\n");
-      break;
-  }
-
-  printf("  push rax\n");
-}
-
-
-int main(int argc, char *argv[])
-{
-  if(argc != 2)
-  {
-    fprintf(stderr, "Invalid arg num\n");
-    return 1;
-  }
-
-  tokenize(argv[1]);
-  program();
-
-  printf(".intel_syntax noprefix\n");
-  printf(".global main\n");
-  printf("main:\n");
-
-  // prologue
-  printf("  push rbp\n");
-  printf("  mov rbp, rsp\n");
-  printf("  sub rsp, 208\n");
-
-  for (int i = 0; code[i]; i++){
-    gen(code[i]);
-    printf("  pop rax\n");
-  }
-
-  // epilogue
-  printf("  mov rsp, rbp\n");
-  printf("  pop rbp\n");
-  printf("  ret\n");
-
-  return 0;
 }
